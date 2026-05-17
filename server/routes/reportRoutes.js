@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const authenticate = require('../middleware/authenticate');
 const requireRole = require('../middleware/requireRole');
 const Report = require('../models/Report');
@@ -14,20 +15,20 @@ const { publishRescueEvent, getTopPriorities, removeFromQueue } = require('../se
 // POST /api/reports — Victim submits a disaster report with location + needs
 router.post('/', authenticate, requireRole('Victim'), async (req, res) => {
   try {
-    const { longitude, latitude, needs, medicalEmergency } = req.body;
+    const { longitude, latitude, needs, category } = req.body;
     
     if (longitude == null || latitude == null || !needs) {
       return res.status(400).json({ success: false, message: 'Please provide longitude, latitude, and needs' });
     }
 
     const report = new Report({
-      victim: req.user._id,
+      victim: req.user.id,
       location: {
         type: 'Point',
         coordinates: [longitude, latitude]
       },
       needs,
-      medicalEmergency: medicalEmergency || false
+      category: category || 'other'
     });
 
     await report.save();
@@ -89,7 +90,7 @@ router.patch('/:id/claim', authenticate, requireRole('RescueTeam'), async (req, 
       { _id: reportId, status: 'Pending' },
       { 
         status: 'Claimed',
-        assignedTeam: req.user._id
+        assignedTeam: req.user.id
       },
       { new: true } // Returns the modified document
     ).populate('victim', 'name email');
@@ -127,11 +128,24 @@ router.get('/priority', authenticate, requireRole('RescueTeam'), async (req, res
       return res.json({ success: true, count: 0, data: [] });
     }
 
-    const reportIds = topItems.map(item => item.reportId);
+    // Filter valid MongoDB ObjectIds and remove invalid ones from Redis
+    const validReportIds = [];
+    for (const item of topItems) {
+      if (mongoose.Types.ObjectId.isValid(item.reportId)) {
+        validReportIds.push(item.reportId);
+      } else {
+        console.warn(`[Redis Queue] Invalid ObjectId found: ${item.reportId}. Removing from queue.`);
+        await removeFromQueue(item.reportId);
+      }
+    }
+
+    if (!validReportIds.length) {
+       return res.json({ success: true, count: 0, data: [] });
+    }
 
     // 2. Fetch full report documents from MongoDB
     // We use $in to fetch them, but MongoDB doesn't guarantee order.
-    const reports = await Report.find({ _id: { $in: reportIds } })
+    const reports = await Report.find({ _id: { $in: validReportIds } })
       .populate('victim', 'name email');
 
     // 3. Re-sort the reports to match the Redis priority order
@@ -143,6 +157,21 @@ router.get('/priority', authenticate, requireRole('RescueTeam'), async (req, res
       success: true,
       count: sortedReports.length,
       data: sortedReports
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// GET /api/reports/my — Victim views their own reports
+router.get('/my', authenticate, requireRole('Victim'), async (req, res) => {
+  try {
+    const reports = await Report.find({ victim: req.user.id }).sort({ createdAt: -1 });
+    res.json({
+      success: true,
+      count: reports.length,
+      data: reports
     });
   } catch (err) {
     console.error(err);

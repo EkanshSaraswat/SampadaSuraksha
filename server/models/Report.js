@@ -21,9 +21,11 @@ const reportSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  medicalEmergency: {
-    type: Boolean,
-    default: false
+  category: {
+    type: String,
+    enum: ['medical', 'trapped', 'shelter', 'food_water', 'other'],
+    required: true,
+    default: 'other'
   },
   status: {
     type: String,

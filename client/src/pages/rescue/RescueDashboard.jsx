@@ -65,9 +65,25 @@ export default function RescueDashboard() {
     navigate('/login', { replace: true })
   }
 
-  function getUrgencyBadge(isEmergency) {
-    if (isEmergency) return 'badge badge-emergency'
-    return 'badge badge-normal'
+  function getUrgencyBadge(category) {
+    switch (category) {
+      case 'medical': return 'badge badge-emergency'
+      case 'trapped': return 'badge badge-emergency'
+      case 'shelter': return 'badge badge-warning'
+      case 'food_water': return 'badge badge-warning'
+      default: return 'badge badge-normal'
+    }
+  }
+
+  function formatCategory(category) {
+    const map = {
+      'medical': 'Medical Emergency',
+      'trapped': 'Trapped',
+      'shelter': 'Need Shelter',
+      'food_water': 'Food & Water',
+      'other': 'Other'
+    };
+    return map[category] || 'Other';
   }
 
   return (
@@ -123,7 +139,7 @@ export default function RescueDashboard() {
                   <div className="report-card-info">
                     <div className="report-card-desc">{report.needs}</div>
                     <div className="report-card-meta">
-                      <span className={getUrgencyBadge(report.medicalEmergency)}>{report.medicalEmergency ? 'Medical Emergency' : 'Normal'}</span>
+                      <span className={getUrgencyBadge(report.category)}>{formatCategory(report.category)}</span>
                       <span>📍 {report.location?.coordinates?.[1]}, {report.location?.coordinates?.[0]}</span>
                     </div>
                   </div>

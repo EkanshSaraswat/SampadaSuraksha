@@ -13,7 +13,7 @@ export default function VictimDashboard() {
   const [loadingReports, setLoadingReports] = useState(true)
   const [form, setForm] = useState({
     needs: '',
-    medicalEmergency: false,
+    category: 'other',
     latitude: '',
     longitude: '',
   })
@@ -54,14 +54,14 @@ export default function VictimDashboard() {
         `${API}/reports`,
         {
           needs: form.needs.trim(),
-          medicalEmergency: form.medicalEmergency,
+          category: form.category,
           latitude: parseFloat(form.latitude),
           longitude: parseFloat(form.longitude),
         },
         authHeader
       )
       setSuccess('Report submitted successfully!')
-      setForm({ needs: '', medicalEmergency: false, latitude: '', longitude: '' })
+      setForm({ needs: '', category: 'other', latitude: '', longitude: '' })
       fetchReports()
     } catch (err) {
       const msg =
@@ -86,9 +86,25 @@ export default function VictimDashboard() {
     return 'badge badge-pending'
   }
 
-  function getUrgencyBadge(isEmergency) {
-    if (isEmergency) return 'badge badge-emergency'
-    return 'badge badge-normal'
+  function getUrgencyBadge(category) {
+    switch (category) {
+      case 'medical': return 'badge badge-emergency'
+      case 'trapped': return 'badge badge-emergency'
+      case 'shelter': return 'badge badge-warning'
+      case 'food_water': return 'badge badge-warning'
+      default: return 'badge badge-normal'
+    }
+  }
+
+  function formatCategory(category) {
+    const map = {
+      'medical': 'Medical Emergency',
+      'trapped': 'Trapped',
+      'shelter': 'Need Shelter',
+      'food_water': 'Food & Water',
+      'other': 'Other'
+    };
+    return map[category] || 'Other';
   }
 
   return (
@@ -144,12 +160,15 @@ export default function VictimDashboard() {
               <label htmlFor="report-urgency">Urgency Level</label>
               <select
                 id="report-urgency"
-                name="medicalEmergency"
-                value={form.medicalEmergency}
-                onChange={(e) => setForm(prev => ({ ...prev, medicalEmergency: e.target.value === 'true' }))}
+                name="category"
+                value={form.category}
+                onChange={(e) => setForm(prev => ({ ...prev, category: e.target.value }))}
               >
-                <option value="false">Normal</option>
-                <option value="true">Medical Emergency</option>
+                <option value="medical">Medical Emergency</option>
+                <option value="trapped">Trapped / Needs Rescue</option>
+                <option value="shelter">Need Shelter</option>
+                <option value="food_water">Need Food or Water</option>
+                <option value="other">Other / General</option>
               </select>
             </div>
 
@@ -212,7 +231,7 @@ export default function VictimDashboard() {
                 <div className="report-card-info">
                   <div className="report-card-desc">{report.needs}</div>
                   <div className="report-card-meta">
-                    <span className={getUrgencyBadge(report.medicalEmergency)}>{report.medicalEmergency ? 'Medical Emergency' : 'Normal'}</span>
+                    <span className={getUrgencyBadge(report.category)}>{formatCategory(report.category)}</span>
                     <span className={getStatusBadge(report.status)}>{report.status || 'Pending'}</span>
                     <span>📍 {report.location?.coordinates?.[1]}, {report.location?.coordinates?.[0]}</span>
                   </div>
