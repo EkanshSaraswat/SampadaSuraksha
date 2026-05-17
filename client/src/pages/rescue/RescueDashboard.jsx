@@ -19,14 +19,14 @@ export default function RescueDashboard() {
   const fetchReports = useCallback(async () => {
     try {
       const { data } = await axios.get(`${API}/reports`, authHeader)
-      const all = Array.isArray(data) ? data : data.reports || []
+      const all = data.data || Array.isArray(data) ? data : data.reports || []
       // Show unassigned reports, sorted: Medical Emergency first
       const unassigned = all.filter(
-        r => !r.claimedBy && (r.status === 'pending' || r.status === 'Pending' || !r.status)
+        r => !r.assignedTeam && (r.status === 'pending' || r.status === 'Pending' || !r.status)
       )
       unassigned.sort((a, b) => {
-        if (a.urgency === 'Medical Emergency' && b.urgency !== 'Medical Emergency') return -1
-        if (a.urgency !== 'Medical Emergency' && b.urgency === 'Medical Emergency') return 1
+        if (a.medicalEmergency && !b.medicalEmergency) return -1
+        if (!a.medicalEmergency && b.medicalEmergency) return 1
         return 0
       })
       setReports(unassigned)
@@ -74,8 +74,8 @@ export default function RescueDashboard() {
     navigate('/login', { replace: true })
   }
 
-  function getUrgencyBadge(urgency) {
-    if (urgency === 'Medical Emergency') return 'badge badge-emergency'
+  function getUrgencyBadge(isEmergency) {
+    if (isEmergency) return 'badge badge-emergency'
     return 'badge badge-normal'
   }
 
@@ -130,10 +130,10 @@ export default function RescueDashboard() {
               return (
                 <div className="report-card" key={id}>
                   <div className="report-card-info">
-                    <div className="report-card-desc">{report.description}</div>
+                    <div className="report-card-desc">{report.needs}</div>
                     <div className="report-card-meta">
-                      <span className={getUrgencyBadge(report.urgency)}>{report.urgency}</span>
-                      <span>📍 {report.latitude}, {report.longitude}</span>
+                      <span className={getUrgencyBadge(report.medicalEmergency)}>{report.medicalEmergency ? 'Medical Emergency' : 'Normal'}</span>
+                      <span>📍 {report.location?.coordinates?.[1]}, {report.location?.coordinates?.[0]}</span>
                     </div>
                   </div>
                   <button

@@ -3,6 +3,7 @@ const router = express.Router();
 const authenticate = require('../middleware/authenticate');
 const requireRole = require('../middleware/requireRole');
 const Report = require('../models/Report');
+const { publishRescueEvent } = require('../services/redisService');
 
 /**
  * STUB ROUTES — Report Management
@@ -31,8 +32,8 @@ router.post('/', authenticate, requireRole('Victim'), async (req, res) => {
 
     await report.save();
 
-    // Placeholder for Member 3's Redis publish logic:
-    // await redisClient.publish('rescue-needed', JSON.stringify(report));
+    // Call Member 3's Redis publish logic
+    await publishRescueEvent(report);
 
     res.status(201).json({
       success: true,
