@@ -12,8 +12,8 @@ export default function VictimDashboard() {
   const [reports, setReports] = useState([])
   const [loadingReports, setLoadingReports] = useState(true)
   const [form, setForm] = useState({
-    description: '',
-    urgency: 'Normal',
+    needs: '',
+    medicalEmergency: false,
     latitude: '',
     longitude: '',
   })
@@ -64,15 +64,15 @@ export default function VictimDashboard() {
       await axios.post(
         `${API}/reports`,
         {
-          description: form.description.trim(),
-          urgency: form.urgency,
+          needs: form.needs.trim(),
+          medicalEmergency: form.medicalEmergency,
           latitude: parseFloat(form.latitude),
           longitude: parseFloat(form.longitude),
         },
         authHeader
       )
       setSuccess('Report submitted successfully!')
-      setForm({ description: '', urgency: 'Normal', latitude: '', longitude: '' })
+      setForm({ needs: '', medicalEmergency: false, latitude: '', longitude: '' })
       fetchReports()
     } catch (err) {
       const msg =
@@ -97,8 +97,8 @@ export default function VictimDashboard() {
     return 'badge badge-pending'
   }
 
-  function getUrgencyBadge(urgency) {
-    if (urgency === 'Medical Emergency') return 'badge badge-emergency'
+  function getUrgencyBadge(isEmergency) {
+    if (isEmergency) return 'badge badge-emergency'
     return 'badge badge-normal'
   }
 
@@ -140,11 +140,11 @@ export default function VictimDashboard() {
 
           <form onSubmit={handleSubmit} noValidate>
             <div className="form-group">
-              <label htmlFor="report-desc">Description</label>
+              <label htmlFor="report-desc">Needs / Description</label>
               <textarea
                 id="report-desc"
-                name="description"
-                value={form.description}
+                name="needs"
+                value={form.needs}
                 onChange={handleChange}
                 placeholder="Describe the situation and what help you need…"
                 required
@@ -155,12 +155,12 @@ export default function VictimDashboard() {
               <label htmlFor="report-urgency">Urgency Level</label>
               <select
                 id="report-urgency"
-                name="urgency"
-                value={form.urgency}
-                onChange={handleChange}
+                name="medicalEmergency"
+                value={form.medicalEmergency}
+                onChange={(e) => setForm(prev => ({ ...prev, medicalEmergency: e.target.value === 'true' }))}
               >
-                <option value="Normal">Normal</option>
-                <option value="Medical Emergency">Medical Emergency</option>
+                <option value="false">Normal</option>
+                <option value="true">Medical Emergency</option>
               </select>
             </div>
 
@@ -221,11 +221,11 @@ export default function VictimDashboard() {
             reports.map(report => (
               <div className="report-card" key={report._id || report.id}>
                 <div className="report-card-info">
-                  <div className="report-card-desc">{report.description}</div>
+                  <div className="report-card-desc">{report.needs}</div>
                   <div className="report-card-meta">
-                    <span className={getUrgencyBadge(report.urgency)}>{report.urgency}</span>
+                    <span className={getUrgencyBadge(report.medicalEmergency)}>{report.medicalEmergency ? 'Medical Emergency' : 'Normal'}</span>
                     <span className={getStatusBadge(report.status)}>{report.status || 'Pending'}</span>
-                    <span>📍 {report.latitude}, {report.longitude}</span>
+                    <span>📍 {report.location?.coordinates?.[1]}, {report.location?.coordinates?.[0]}</span>
                   </div>
                 </div>
               </div>

@@ -18,14 +18,6 @@ const Redis = require('ioredis');
 const CHANNEL   = 'rescue-needed';
 const QUEUE_KEY = 'rescue_queue';
 
-const PRIORITY_SCORES = {
-  medical:    100,
-  trapped:    80,
-  shelter:    60,
-  food_water: 40,
-  other:      20
-};
-
 const CATEGORIES  = ['medical', 'trapped', 'shelter', 'food_water', 'other'];
 const FIRST_NAMES = ['Aarav', 'Priya', 'Rohan', 'Sneha', 'Vikram', 'Anita', 'Karan', 'Meera', 'Arjun', 'Deepa',
                      'Rahul', 'Pooja', 'Nikhil', 'Kavya', 'Amit', 'Sonal', 'Raj', 'Neha', 'Dev', 'Anjali'];
@@ -59,14 +51,14 @@ function generateMockReports(count) {
   const reports = [];
   for (let i = 0; i < count; i++) {
     const category = randomItem(CATEGORIES);
+    const isEmergency = category === 'medical';
     reports.push({
-      _id:        `sim_${Date.now()}_${i}`,
-      victimName: randomItem(FIRST_NAMES),
-      description: randomItem(DESCRIPTIONS),
-      category,
-      location: { type: 'Point', coordinates: randomCoords() },
-      status:    'pending',
-      createdAt: new Date().toISOString()
+      _id:              `sim_${Date.now()}_${i}`,
+      needs:            randomItem(DESCRIPTIONS),
+      medicalEmergency: isEmergency,
+      location:         { type: 'Point', coordinates: randomCoords() },
+      status:           'Pending',
+      createdAt:        new Date().toISOString()
     });
   }
   return reports;
@@ -95,15 +87,14 @@ async function main() {
   // Count categories for summary
   const categoryCounts = {};
   reports.forEach(r => {
-    categoryCounts[r.category] = (categoryCounts[r.category] || 0) + 1;
+    const cat = r.medicalEmergency ? 'medical' : 'other';
+    categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
   });
 
   console.log(`📊  Generated ${REPORT_COUNT} mock reports:`);
-  Object.entries(categoryCounts)
-    .sort((a, b) => PRIORITY_SCORES[b[0]] - PRIORITY_SCORES[a[0]])
-    .forEach(([cat, count]) => {
-      console.log(`    ${cat.padEnd(12)} → ${count} reports  (priority: ${PRIORITY_SCORES[cat]})`);
-    });
+  Object.entries(categoryCounts).forEach(([cat, count]) => {
+    console.log(`    ${cat.padEnd(12)} → ${count} reports`);
+  });
   console.log('');
 
   // ── Phase 1: Publish all events via pipeline ──
@@ -112,15 +103,7 @@ async function main() {
 
   const pubPipeline = redis.pipeline();
   reports.forEach(report => {
-    const payload = JSON.stringify({
-      id:        report._id,
-      victim:    report.victimName,
-      category:  report.category,
-      coords:    report.location.coordinates,
-      status:    report.status,
-      createdAt: report.createdAt
-    });
-    pubPipeline.publish(CHANNEL, payload);
+    pubPipeline.publish(CHANNEL, JSON.stringify(report));
   });
 
   await pubPipeline.exec();
@@ -132,20 +115,9 @@ async function main() {
   const startQueue = Date.now();
 
   const queuePipeline = redis.pipeline();
-  reports.forEach((report, i) => {
-    const base = PRIORITY_SCORES[report.category] || 20;
-    const timeFraction = (i + 1) / 100000;   // deterministic ordering within same category
-    const score = base + timeFraction;
-
-    const member = JSON.stringify({
-      id:       report._id,
-      victim:   report.victimName,
-      category: report.category,
-      coords:   report.location.coordinates,
-      status:   report.status
-    });
-
-    queuePipeline.zadd(QUEUE_KEY, score, member);
+  reports.forEach((report) => {
+    const score = report.medicalEmergency ? Date.now() - 10000000000 : Date.now();
+    queuePipeline.zadd(QUEUE_KEY, score, report._id);
   });
 
   await queuePipeline.exec();
@@ -153,17 +125,17 @@ async function main() {
   console.log(`    ✅  Queued ${REPORT_COUNT} reports in ${queueTime}ms\n`);
 
   // ── Phase 3: Verify — show top 10 priorities ──
-  console.log('🏆  Phase 3: Top 10 Priority Reports:');
-  console.log('─'.repeat(70));
+  console.log('🏆  Phase 3: Top 10 Priority Reports (lowest score = highest priority):');
+  console.log('─'.repeat(60));
 
-  const topResults = await redis.zrevrange(QUEUE_KEY, 0, 9, 'WITHSCORES');
+  const topResults = await redis.zrange(QUEUE_KEY, 0, 9, 'WITHSCORES');
   for (let i = 0; i < topResults.length; i += 2) {
-    const data  = JSON.parse(topResults[i]);
-    const score = parseFloat(topResults[i + 1]).toFixed(5);
+    const id    = topResults[i];
+    const score = parseFloat(topResults[i + 1]).toFixed(0);
     const rank  = (i / 2) + 1;
-    console.log(`  #${String(rank).padStart(2)}  |  Score: ${score}  |  Category: ${data.category.padEnd(12)}  |  Victim: ${data.victim}`);
+    console.log(`  #${String(rank).padStart(2)}  |  Score: ${score}  |  ID: ${id}`);
   }
-  console.log('─'.repeat(70));
+  console.log('─'.repeat(60));
 
   // ── Summary ──
   const totalSize = await redis.zcard(QUEUE_KEY);
@@ -171,14 +143,6 @@ async function main() {
   console.log(`⏱️  Total time: ${pubTime + queueTime}ms`);
   console.log(`    Publish:  ${pubTime}ms`);
   console.log(`    Queue:    ${queueTime}ms`);
-
-  // Verify medical emergencies are at the top
-  const topCategory = JSON.parse(topResults[0]).category;
-  if (topCategory === 'medical') {
-    console.log('\n✅  VERIFICATION PASSED: Medical emergencies are at the top of the queue!');
-  } else {
-    console.log(`\n⚠️  VERIFICATION NOTE: Top category is "${topCategory}" — may be correct if no medical reports were generated.`);
-  }
 
   console.log('\n═══════════════════════════════════════════');
   console.log('  ✅  Load simulation complete!');

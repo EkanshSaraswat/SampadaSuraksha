@@ -1,44 +1,43 @@
 const mongoose = require('mongoose');
 
 const reportSchema = new mongoose.Schema({
-  victimName: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  description: {
-    type: String,
-    required: true
-  },
-  category: {
-    type: String,
-    enum: ['medical', 'trapped', 'shelter', 'food_water', 'other'],
+  victim: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
     required: true
   },
   location: {
     type: {
       type: String,
       enum: ['Point'],
-      default: 'Point'
+      required: true
     },
     coordinates: {
-      type: [Number],   // [longitude, latitude]
-      required: true
+      type: [Number],
+      required: true // [longitude, latitude]
     }
+  },
+  needs: {
+    type: String,
+    required: true
+  },
+  medicalEmergency: {
+    type: Boolean,
+    default: false
   },
   status: {
     type: String,
-    enum: ['pending', 'claimed', 'resolved'],
-    default: 'pending'
+    enum: ['Pending', 'Claimed', 'Resolved'],
+    default: 'Pending'
   },
-  claimedBy: {
+  assignedTeam: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     default: null
   }
 }, { timestamps: true });
 
-// GeoJSON 2dsphere index for proximity queries
+// Create 2dsphere index for location for geospatial queries
 reportSchema.index({ location: '2dsphere' });
 
 module.exports = mongoose.model('Report', reportSchema);
