@@ -19,7 +19,7 @@ export default function RescueDashboard() {
   const fetchReports = useCallback(async () => {
     try {
       const { data } = await axios.get(`${API}/reports/priority`, authHeader)
-      const all = data.data || Array.isArray(data) ? data : data.reports || []
+      const all = data?.data || data?.reports || (Array.isArray(data) ? data : [])
       setReports(all)
     } catch {
       setReports([])
