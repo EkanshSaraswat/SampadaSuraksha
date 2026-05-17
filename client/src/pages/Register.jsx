@@ -7,7 +7,14 @@ const ROLES = ['Victim', 'RescueTeam', 'NGO', 'Admin', 'ResourceProvider']
 export default function Register() {
   const navigate = useNavigate()
 
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: '' })
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: '',
+    city: '',
+    state: '',
+  })
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
@@ -29,12 +36,26 @@ export default function Register() {
     setLoading(true)
 
     try {
-      await axios.post('http://localhost:5000/api/auth/register', {
+      const payload = {
         name: form.name.trim(),
         email: form.email.trim(),
         password: form.password,
         role: form.role,
-      })
+      }
+      if (form.role === 'NGO' || form.role === 'ResourceProvider') {
+        payload.city = form.city.trim()
+        payload.state = form.state.trim()
+      }
+
+      const { data } = await axios.post('/api/auth/register', payload)
+
+      if (data.pendingApproval) {
+        setSuccess(
+          data.message ||
+            'Registration received. An admin must approve your rescue team account before you can sign in.'
+        )
+        return
+      }
 
       setSuccess('Account created! Redirecting to login…')
       setTimeout(() => navigate('/login', { replace: true }), 1500)
@@ -122,6 +143,35 @@ export default function Register() {
               ))}
             </select>
           </div>
+
+          {(form.role === 'NGO' || form.role === 'ResourceProvider') && (
+            <>
+              <div className="form-group">
+                <label htmlFor="reg-city">City / district</label>
+                <input
+                  id="reg-city"
+                  type="text"
+                  name="city"
+                  value={form.city}
+                  onChange={handleChange}
+                  placeholder="e.g. Mumbai"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="reg-state">State</label>
+                <input
+                  id="reg-state"
+                  type="text"
+                  name="state"
+                  value={form.state}
+                  onChange={handleChange}
+                  placeholder="e.g. Maharashtra"
+                  required
+                />
+              </div>
+            </>
+          )}
 
           <button
             id="register-submit-btn"

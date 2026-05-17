@@ -8,19 +8,62 @@ const generateToken = require('../utils/generateToken');
  */
 const register = async (req, res, next) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, city, state, latitude, longitude } = req.body;
+
+    if (role === 'NGO' || role === 'ResourceProvider') {
+      if (!city?.trim() || !state?.trim()) {
+        res.status(400);
+        throw new Error('City and state are required for NGO and Resource Provider accounts');
+      }
+    }
 
     // Check if user already exists
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
     if (existingUser) {
       res.status(400);
       throw new Error('An account with this email already exists');
     }
 
-    // Create new user (password is hashed automatically by pre-save hook)
-    const user = await User.create({ name, email, password, role });
+    const approvalStatus = role === 'RescueTeam' ? 'pending' : 'approved';
 
-    // Generate JWT and respond
+    const profile = {};
+    if (city) profile.city = String(city).trim();
+    if (state) profile.state = String(state).trim();
+    if (latitude != null && longitude != null) {
+      const lat = Number(latitude);
+      const lng = Number(longitude);
+      if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+        profile.latitude = lat;
+        profile.longitude = lng;
+      }
+    }
+
+    const user = await User.create({
+      name,
+      email,
+      password,
+      role,
+      approvalStatus,
+      ...profile,
+    });
+
+    // Rescue teams cannot log in until approved — no token yet
+    if (role === 'RescueTeam') {
+      return res.status(201).json({
+        success: true,
+        pendingApproval: true,
+        message:
+          'Registration received. An admin must approve your rescue team account before you can sign in.',
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          approvalStatus: user.approvalStatus,
+        },
+      });
+    }
+
     const token = generateToken(user);
 
     res.status(201).json({
@@ -31,6 +74,7 @@ const register = async (req, res, next) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        approvalStatus: user.approvalStatus,
       },
     });
   } catch (err) {
@@ -48,20 +92,31 @@ const login = async (req, res, next) => {
     const { email, password } = req.body;
 
     // Find user by email
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
     if (!user) {
       res.status(401);
       throw new Error('Invalid email or password');
     }
 
-    // Check password
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
       res.status(401);
       throw new Error('Invalid email or password');
     }
 
-    // Generate JWT and respond
+    if (user.role === 'RescueTeam') {
+      if (user.approvalStatus === 'pending') {
+        res.status(403);
+        throw new Error(
+          'Your rescue team account is awaiting admin approval. You will be able to sign in once approved.'
+        );
+      }
+      if (user.approvalStatus === 'rejected') {
+        res.status(403);
+        throw new Error('Your rescue team registration was not approved. Contact the administrator.');
+      }
+    }
+
     const token = generateToken(user);
 
     res.json({
@@ -72,6 +127,7 @@ const login = async (req, res, next) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        approvalStatus: user.approvalStatus,
       },
     });
   } catch (err) {

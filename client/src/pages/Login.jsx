@@ -29,7 +29,7 @@ export default function Login() {
     setLoading(true)
 
     try {
-      const { data } = await axios.post('http://localhost:5000/api/auth/login', {
+      const { data } = await axios.post('/api/auth/login', {
         email: form.email.trim(),
         password: form.password,
       })
