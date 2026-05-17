@@ -3,7 +3,7 @@ const router = express.Router();
 const authenticate = require('../middleware/authenticate');
 const requireRole = require('../middleware/requireRole');
 const Report = require('../models/Report');
-const { publishRescueEvent } = require('../services/redisService');
+const { publishRescueEvent, getTopPriorities, removeFromQueue } = require('../services/redisService');
 
 /**
  * STUB ROUTES — Report Management
@@ -101,10 +101,48 @@ router.patch('/:id/claim', authenticate, requireRole('RescueTeam'), async (req, 
       });
     }
 
+    // Remove from Redis priority queue so other teams don't see it
+    await removeFromQueue(reportId);
+
     res.json({
       success: true,
       message: 'Report successfully claimed',
       data: report
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// GET /api/reports/priority — Rescue teams fetch top priority reports from Redis queue
+router.get('/priority', authenticate, requireRole('RescueTeam'), async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    
+    // 1. Get top report IDs from Redis sorted set
+    const topItems = await getTopPriorities(limit);
+    
+    if (!topItems.length) {
+      return res.json({ success: true, count: 0, data: [] });
+    }
+
+    const reportIds = topItems.map(item => item.reportId);
+
+    // 2. Fetch full report documents from MongoDB
+    // We use $in to fetch them, but MongoDB doesn't guarantee order.
+    const reports = await Report.find({ _id: { $in: reportIds } })
+      .populate('victim', 'name email');
+
+    // 3. Re-sort the reports to match the Redis priority order
+    const sortedReports = topItems.map(item => {
+      return reports.find(r => r._id.toString() === item.reportId);
+    }).filter(Boolean); // Filter out any nulls (if a report was deleted in Mongo but still in Redis)
+
+    res.json({
+      success: true,
+      count: sortedReports.length,
+      data: sortedReports
     });
   } catch (err) {
     console.error(err);

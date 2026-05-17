@@ -18,18 +18,9 @@ export default function RescueDashboard() {
 
   const fetchReports = useCallback(async () => {
     try {
-      const { data } = await axios.get(`${API}/reports`, authHeader)
+      const { data } = await axios.get(`${API}/reports/priority`, authHeader)
       const all = data.data || Array.isArray(data) ? data : data.reports || []
-      // Show unassigned reports, sorted: Medical Emergency first
-      const unassigned = all.filter(
-        r => !r.assignedTeam && (r.status === 'pending' || r.status === 'Pending' || !r.status)
-      )
-      unassigned.sort((a, b) => {
-        if (a.medicalEmergency && !b.medicalEmergency) return -1
-        if (!a.medicalEmergency && b.medicalEmergency) return 1
-        return 0
-      })
-      setReports(unassigned)
+      setReports(all)
     } catch {
       setReports([])
     } finally {
