@@ -19,6 +19,10 @@ app.use(express.json());
 // --- Health Check ---
 app.get('/', (req, res) => res.json({ message: 'SampadaSuraksha API running' }));
 
+// ── Redis Subscriber (starts listening on boot) ──
+const { subscribeToRescueEvents } = require('./services/redisQueueService');
+subscribeToRescueEvents();
+
 // --- API Routes ---
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/reports', require('./routes/reportRoutes'));
