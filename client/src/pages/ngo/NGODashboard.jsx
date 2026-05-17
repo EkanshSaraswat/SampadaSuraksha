@@ -44,6 +44,8 @@ export default function NGODashboard() {
     members: [emptyTeamMember()],
   })
   const [creatingTeam, setCreatingTeam] = useState(false)
+  const [linkEmail, setLinkEmail] = useState('')
+  const [linkingTeam, setLinkingTeam] = useState(false)
   const [dispatchMode, setDispatchMode] = useState(null)
   // { reportId, teamId?, mode: 'new' | 'edit' }
 
@@ -200,6 +202,32 @@ export default function NGODashboard() {
       })
     } finally {
       setCreatingTeam(false)
+    }
+  }
+
+  async function handleLinkTeam(e) {
+    e.preventDefault()
+    setLinkingTeam(true)
+    setMessage({ type: '', text: '' })
+    try {
+      const { data } = await axios.patch(
+        `${API}/teams/link`,
+        { email: linkEmail.trim() },
+        headers
+      )
+      setMessage({
+        type: 'success',
+        text: data.message || 'Rescue team linked successfully.',
+      })
+      setLinkEmail('')
+      fetchTeams()
+    } catch (err) {
+      setMessage({
+        type: 'error',
+        text: err.response?.data?.message || 'Failed to link team.',
+      })
+    } finally {
+      setLinkingTeam(false)
     }
   }
 
@@ -754,6 +782,34 @@ export default function NGODashboard() {
 
               <button type="submit" className="btn btn-primary" disabled={creatingTeam}>
                 {creatingTeam ? <span className="spinner" /> : 'Create rescue team'}
+              </button>
+            </form>
+
+            {/* Link Existing Team Form */}
+            <form
+              onSubmit={handleLinkTeam}
+              style={{
+                marginBottom: '1.5rem',
+                padding: '1rem',
+                background: 'var(--color-surface-2)',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--color-border)',
+              }}
+            >
+              <h3 style={{ margin: '0 0 1rem', fontSize: '1rem' }}>Link existing rescue team</h3>
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label htmlFor="link-team-email">Team login email</label>
+                <input
+                  id="link-team-email"
+                  type="email"
+                  value={linkEmail}
+                  onChange={e => setLinkEmail(e.target.value)}
+                  placeholder="Enter the email of the existing rescue team"
+                  required
+                />
+              </div>
+              <button type="submit" className="btn btn-primary" disabled={linkingTeam}>
+                {linkingTeam ? <span className="spinner" /> : 'Link Team'}
               </button>
             </form>
 

@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const authenticate = require('../middleware/authenticate');
 const requireRole = require('../middleware/requireRole');
 const Report = require('../models/Report');
@@ -189,6 +190,7 @@ router.get('/priority', authenticate, requireRole('RescueTeam'), async (req, res
       reports: sortedReports
     });
   } catch (err) {
+    console.error('[Priority Route Error]', err);
     next(err);
   }
 });

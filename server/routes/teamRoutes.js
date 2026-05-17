@@ -96,6 +96,44 @@ router.post('/', authenticate, requireRole('NGO'), async (req, res, next) => {
   }
 });
 
+// PATCH /api/teams/link — NGO links an existing rescue team by email
+router.patch('/link', authenticate, requireRole('NGO'), async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const loginEmail = (email || '').trim().toLowerCase();
+
+    if (!loginEmail) {
+      res.status(400);
+      throw new Error('Please provide the login email of the rescue team');
+    }
+
+    const team = await User.findOne({ email: loginEmail, role: 'RescueTeam' });
+    if (!team) {
+      res.status(404);
+      throw new Error('Rescue team not found with this email');
+    }
+
+    // Check if already linked
+    if (team.affiliatedNGO && team.affiliatedNGO.toString() === req.user.id.toString()) {
+      res.status(400);
+      throw new Error('This rescue team is already linked to your NGO');
+    }
+
+    team.affiliatedNGO = req.user.id;
+    await team.save();
+
+    const safe = await User.findById(team._id).select('-password');
+
+    res.json({
+      success: true,
+      message: `Rescue team "${team.name}" has been linked to your NGO.`,
+      team: safe,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/teams — Admin/NGO view rescue teams with workload
 // NGO: ?mine=true (default) = only teams created by this NGO
 router.get('/', authenticate, requireRole('Admin', 'NGO', 'ResourceProvider'), async (req, res, next) => {
