@@ -2,11 +2,14 @@ const { redisClient, redisSubscriber } = require('../config/redis');
 
 // ── Priority scoring ──
 const PRIORITY_SCORES = {
-  medical:    100,
-  trapped:    80,
-  shelter:    60,
-  food_water: 40,
-  other:      20
+  'Medical Emergency': 100, // Top priority
+  'Earthquake': 80,
+  'Cyclone': 80,
+  'Fire': 80,
+  'Flood': 60,
+  'Landslide': 60,
+  'Drought': 40,
+  'Other': 20
 };
 
 const CHANNEL  = 'rescue-needed';
@@ -27,8 +30,8 @@ async function publishRescueEvent(report) {
     const payload = JSON.stringify(report);
     await redisClient.publish(CHANNEL, payload);
 
-    // Also add to priority queue
-    const baseScore = PRIORITY_SCORES[report.category] || 20;
+    // Base score is either Medical Emergency (100) or based on disasterType
+    const baseScore = report.urgency === 'Medical Emergency' ? 100 : (PRIORITY_SCORES[report.disasterType] || 20);
     // Lower score means higher priority in zrange, or we can use zrevrange if higher is better.
     // Actually, earlier the load script used zrange and subtracted timestamps. 
     // Wait, let's keep lower scores = higher priority by doing:
@@ -66,7 +69,7 @@ function subscribeToRescueEvents() {
   redisSubscriber.on('message', (channel, message) => {
     if (channel === CHANNEL) {
       const data = JSON.parse(message);
-      console.log(`🚨  [RESCUE EVENT]  Needs: ${data.needs}  |  Category: ${data.category}  |  ID: ${data._id}`);
+      console.log(`🚨  [RESCUE EVENT]  Disaster: ${data.disasterType}  |  Urgency: ${data.urgency}  |  ID: ${data._id}`);
     }
   });
 }
