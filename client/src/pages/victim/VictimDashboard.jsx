@@ -25,26 +25,15 @@ export default function VictimDashboard() {
 
   const fetchReports = useCallback(async () => {
     try {
-      const { data } = await axios.get(`${API}/reports`, authHeader)
-      // Filter to only this victim's reports if the API returns all
-      const myReports = Array.isArray(data)
-        ? data.filter(r => r.userId === user.id || r.user === user.id)
-        : Array.isArray(data.reports)
-          ? data.reports.filter(r => r.userId === user.id || r.user === user.id)
-          : []
+      const { data } = await axios.get(`${API}/reports/my`, authHeader)
+      const myReports = data?.data || data?.reports || (Array.isArray(data) ? data : [])
       setReports(myReports)
     } catch {
-      // If the endpoint returns user-specific reports already, just use them
-      try {
-        const { data } = await axios.get(`${API}/reports/my`, authHeader)
-        setReports(Array.isArray(data) ? data : data.reports || [])
-      } catch {
-        setReports([])
-      }
+      setReports([])
     } finally {
       setLoadingReports(false)
     }
-  }, [token, user.id])
+  }, [token])
 
   useEffect(() => {
     fetchReports()
