@@ -35,10 +35,10 @@ export default function RescueDashboard() {
   const fetchAll = useCallback(async () => {
     try {
       const [meRes, reportsRes, allocRes, priorityRes] = await Promise.all([
-        axios.get(`${API}/auth/me`, headers),
-        axios.get(`${API}/reports/pending`, headers),
-        axios.get(`${API}/resources/allocations/received`, headers),
-        axios.get(`${API}/reports/priority`, headers),
+        axios.get(`${API}/auth/me`, headers).catch(() => ({ data: { user: null } })),
+        axios.get(`${API}/reports/pending`, headers).catch(() => ({ data: { reports: [] } })),
+        axios.get(`${API}/resources/allocations/received`, headers).catch(() => ({ data: { allocations: [] } })),
+        axios.get(`${API}/reports/priority`, headers).catch(() => ({ data: { reports: [] } })),
       ])
       setProfile(meRes.data.user || null)
       setReports(reportsRes.data.reports || [])

@@ -58,12 +58,14 @@ function subscribeToRescueEvents() {
     return;
   }
 
-  redisSubscriber.subscribe(CHANNEL, (err) => {
-    if (err) {
-      console.error('❌  Failed to subscribe:', err.message);
-      return;
-    }
-    console.log(`🔔  Subscribed to channel: ${CHANNEL}`);
+  redisSubscriber.on('ready', () => {
+    redisSubscriber.subscribe(CHANNEL, (err) => {
+      if (err) {
+        console.error('❌  Failed to subscribe:', err.message);
+        return;
+      }
+      console.log(`🔔  Subscribed to channel: ${CHANNEL}`);
+    });
   });
 
   redisSubscriber.on('message', (channel, message) => {

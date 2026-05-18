@@ -8,6 +8,7 @@ if (process.env.REDIS_URL) {
   redisClient = new Redis(process.env.REDIS_URL, {
     tls: { rejectUnauthorized: false },
     maxRetriesPerRequest: 3,
+    enableOfflineQueue: false,
     retryStrategy(times) {
       return Math.min(times * 200, 2000);     // exponential back-off, max 2 s
     }
@@ -20,6 +21,7 @@ if (process.env.REDIS_URL) {
   redisSubscriber = new Redis(process.env.REDIS_URL, {
     tls: { rejectUnauthorized: false },
     maxRetriesPerRequest: 3,
+    enableOfflineQueue: false,
     retryStrategy(times) {
       return Math.min(times * 200, 2000);
     }
